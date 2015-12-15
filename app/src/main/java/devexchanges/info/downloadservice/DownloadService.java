@@ -10,6 +10,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.URL;
 
 public class DownloadService extends IntentService {
@@ -29,50 +30,34 @@ public class DownloadService extends IntentService {
         String urlPath = intent.getStringExtra(URL);
         String fileName = intent.getStringExtra(FILENAME);
         int result = Activity.RESULT_CANCELED;
-        File output = new File(Environment.getExternalStorageDirectory() + "/Pictures", fileName);
-        if (output.exists()) {
-            output.delete();
-        }
 
-        InputStream stream = null;
-        FileOutputStream fos = null;
         try {
-
             URL url = new URL(urlPath);
-            stream = url.openConnection().getInputStream();
-            InputStreamReader reader = new InputStreamReader(stream);
-            fos = new FileOutputStream(output.getPath());
-            int next = -1;
-            while ((next = reader.read()) != -1) {
-                fos.write(next);
-            }
-            // Successful finished
-            result = Activity.RESULT_OK;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (stream != null) {
-                try {
-                    stream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
+            InputStream input = url.openStream();
+            //The sdcard directory e.g. '/sdcard' can be used directly, or
+            //more safely abstracted with getExternalStorageDirectory()
+            File storagePath = new File(Environment.getExternalStorageDirectory() + "/Pictures");
+            OutputStream output = new FileOutputStream(new File(storagePath, fileName));
+            try {
+                byte[] buffer = new byte[1024];
+                int bytesRead = 0;
+                while ((bytesRead = input.read(buffer, 0, buffer.length)) >= 0) {
+                    output.write(buffer, 0, bytesRead);
                 }
+                result = Activity.RESULT_OK;
+            } finally {
+                output.close();
+                input.close();
             }
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
-        publishResults(output.getAbsolutePath(), result);
+
+        publishResults(result);
     }
 
-    private void publishResults(String outputPath, int result) {
+    private void publishResults(int result) {
         Intent intent = new Intent(NOTIFICATION);
-        intent.putExtra(FILEPATH, outputPath);
         intent.putExtra(RESULT, result);
         sendBroadcast(intent);
     }
